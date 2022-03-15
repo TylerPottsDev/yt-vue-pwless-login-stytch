@@ -15,10 +15,6 @@ const routes = [
 		path: '/login',
 		name: 'login',
 		component: () => import('../views/Login.vue')
-	},
-	{
-		path: '/authenticate',
-		name: 'authenticate'
 	}
 ]
 
@@ -28,45 +24,27 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, from, next) => {
-	if (to.matched.some(record => record.name === 'authenticate')) {
-		const token = to.query.token
+	if (to.query.session_token) {
+		localStorage.setItem('session_token', to.query.session_token)
+		router.replace({'query': null})
+	}
 
+	const token = localStorage.getItem('session_token') || null
+
+	if (to.matched.some(record => record.meta.requiresAuth)) {
 		if (token) {
-			const response = await fetch('http://localhost:5000/auth', {
+			const response = await fetch('http://localhost:5000/verify', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({ token: token })
-			})
-			.then(res => res.json())
-			.catch(err => {
-				console.log(err.response)
-				vm.$toast.error('Something went wrong. Please try again.')
-			})
-
-			if (response.success) {
-				localStorage.setItem('token', response.session_token)
-				vm.$toast.success('Success. Logging in...')
-				return next('/')
-			}
-		}
-	}
-
-	if (to.matched.some(record => record.meta.requiresAuth)) {
-		if (localStorage.getItem('token')) {
-			const response = await fetch('http://localhost:5000/user', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({ token: localStorage.getItem('token') })
 			}).then(res => res.json())
 
 			if (response.success) {
 				return next()
 			} else {
-				localStorage.removeItem('token')
+				localStorage.removeItem('session_token')
 				vm.$toast.error('Something went wrong. Please try again.')
 				return next('/login')
 			}
@@ -74,17 +52,17 @@ router.beforeEach(async (to, from, next) => {
 
 		next('/login')
 	} else if (to.matched.some(record => record.name === 'login')) {
-		if (localStorage.getItem('token')) {
-			const response = await fetch('http://localhost:5000/user', {
+		if (token) {
+			const response = await fetch('http://localhost:5000/verify', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify({ token: localStorage.getItem('token') })
+				body: JSON.stringify({ token: token })
 			}).then(res => res.json())
 
 			if (response.success) {
-				return next('/')
+				next('/')
 			} else {
 				next()
 			}

@@ -1,19 +1,8 @@
 // SETUP
 const express = require("express")
 const stytch = require("stytch")
-const mongoose = require("mongoose")
 const app = express()
 require("dotenv").config()
-
-// Connect to MongoDB
-mongoose
-	.connect(process.env.MONGODB_URI)
-	.then(() => {
-		console.log("Connected to MongoDB");
-	})
-	.catch(err => {
-		console.error("Error connecting to MongoDB: ", err)
-	})
 
 // Stytch setup
 const client = new stytch.Client({
@@ -21,7 +10,7 @@ const client = new stytch.Client({
 	secret: process.env.STYTCH_SECRET,
 	env: process.env.STYTCH_ENV === "test" 
 		? stytch.envs.test 
-		: stytch.envs.prod
+		: stytch.envs.live
 })
 // END OF SETUP
 
@@ -34,103 +23,39 @@ app.use((req, res, next) => {
 })
 // END OF MIDDLEWARE
 
-// MODELS
-const User = require("./models/User")
-// END OF MODELS
-
 // ROUTES
 app.post("/loginorcreate", async (req, res) => {
-	const { email, full_name, isNew } = req.body
+	const { email } = req.body
 
-	const user = await User.findOne({ email })
+	try {
+		const response = await client.magicLinks.email.loginOrCreate({email})
 
-	if (isNew) {
-		if (user) {
-			console.log(user);
+		console.log(response);
 
-			res.status(400).json({
-				success: false,
-				message: "User already exists"
-			})
-			return
-		}
-
-		if (!email || !full_name) {
-			res.status(400).json({
-				success: false,
-				message: "Email and full name required"
-			})
-
-			return
-		}
-
-		const newUser = new User({ email, full_name })
-
-		try {
-			await client.magicLinks.email.loginOrCreate({email})
-
-			newUser
-				.save()
-				.then(() => {
-					res.status(201).json({
-						success: true,
-						message: "User created, email sent"
-					})
-				})
-				.catch(err => {
-					res.status(400).json({
-						success: false,
-						message: "Error creating user",
-						error: err
-					})
-				})
-		} catch (err) {
-			res.status(400).json({
-				success: false,
-				message: "Error creating user",
-				error: err
-			})
-		}
-	} else {
-		if (!user) {
-			res.status(400).json({
-				success: false,
-				message: "User does not exist"
-			})
-			return
-		}
-
-		try {
-			await client.magicLinks.email.loginOrCreate({email})
-	
-			res.status(200).json({
-				success: true,
-				message: "Email sent"
-			})
-		} catch (err) {
-			res.status(400).json({
-				success: false,
-				message: "An error occurred",
-				error: err
-			})
-		}
+		res.status(201).json({
+			success: true,
+			message: `${response.user_created ? 'User created. ' : ''}Magic link sent to ${email}`,
+		})
+	} catch (err) {
+		res.status(400).json({
+			success: false,
+			message: "Error creating user",
+			error: err
+		})
 	}
 })
 
-app.post('/auth', async (req, res) => {
-	console.log("Authenticating...")
-	const { token } = req.body
+app.get('/auth', async (req, res) => {
+	const { token } = req.query
 
 	try {
 		const response = await client.magicLinks.authenticate(token, {
 			session_duration_minutes: 5
 		})
 
-		res.status(200).json({
-			success: true,
-			message: "Authenticated",
-			session_token: response.session_token
-		})
+		console.log(response);
+
+		res.redirect('http://localhost:3000?session_token=' + response.session_token)
 	} catch (err) {
 		console.log(err)
 
@@ -143,29 +68,18 @@ app.post('/auth', async (req, res) => {
 	
 })
 
-app.post('/user', async (req, res) => {
+app.post('/verify', async (req, res) => {
 	const { token } = req.body
 
 	try {
 		const response = await client.sessions.authenticate({session_token: token})
 
-		const u = await client.users.get(response.session.user_id)
+		console.log(response);
 
-		const user = await User.findOne({ email: u.emails[0].email })
-
-		if (!user) {
-			res.status(400).json({
-				success: false,
-				message: "User does not exist"
-			})
-			return
-		} else {
-			res.status(200).json({
-				success: true,
-				message: "User found",
-				user
-			})
-		}
+		res.status(200).json({
+			success: true,
+			message: "Session Verified"
+		})
 	} catch(err) {
 		console.log(err)
 		
@@ -177,13 +91,10 @@ app.post('/user', async (req, res) => {
 	}
 })
 
-app.get('/reset', (req, res) => {
-	User.deleteMany({}, () => {
-		console.log("Deleted all users");
-	}).catch(err => {
-		console.log("An error occurred: ", err);
-	})
-	client.users.delete("user-test-0e2fa20d-5757-4030-92d8-e855ed5f6e9c")
+app.get('/reset/:id', (req, res) => {
+	client
+		.users
+		.delete(req.params.id)
 		.then(resp => {
 			console.log(resp)
 			res.send("User Deleted")

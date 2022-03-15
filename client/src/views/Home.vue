@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 
 const Logout = () => {
-	localStorage.removeItem("token")
+	localStorage.removeItem("session_token")
 	router.push("/login")
 }
 </script>
