@@ -35,43 +35,36 @@ router.beforeEach(async (to, from, next) => {
 		if (token) {
 			const response = await fetch('http://localhost:5000/verify', {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ token: token })
 			}).then(res => res.json())
 
-			if (response.success) {
-				return next()
-			} else {
+			if (!response.success) {
 				localStorage.removeItem('session_token')
 				vm.$toast.error('Something went wrong. Please try again.')
-				return next('/login')
+				next('/login')
+				return
 			}
+		} else {
+			next('/login')
+			return
 		}
-
-		next('/login')
 	} else if (to.matched.some(record => record.name === 'login')) {
 		if (token) {
 			const response = await fetch('http://localhost:5000/verify', {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ token: token })
 			}).then(res => res.json())
 
 			if (response.success) {
 				next('/')
-			} else {
-				next()
+				return
 			}
-		} else {
-			next()
 		}
-	} else {
-		next()
 	}
+
+	next()
 })
 
 export default router;

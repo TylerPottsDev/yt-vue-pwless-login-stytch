@@ -30,8 +30,6 @@ app.post("/loginorcreate", async (req, res) => {
 	try {
 		const response = await client.magicLinks.email.loginOrCreate({email})
 
-		console.log(response);
-
 		res.status(201).json({
 			success: true,
 			message: `${response.user_created ? 'User created. ' : ''}Magic link sent to ${email}`,
@@ -53,9 +51,7 @@ app.get('/auth', async (req, res) => {
 			session_duration_minutes: 5
 		})
 
-		console.log(response);
-
-		res.redirect('http://localhost:3000?session_token=' + response.session_token)
+		res.redirect(`http://localhost:3000?session_token=${response.session_token}`)
 	} catch (err) {
 		console.log(err)
 
@@ -73,8 +69,6 @@ app.post('/verify', async (req, res) => {
 
 	try {
 		const response = await client.sessions.authenticate({session_token: token})
-
-		console.log(response);
 
 		res.status(200).json({
 			success: true,
